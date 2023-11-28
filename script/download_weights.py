@@ -5,6 +5,7 @@ import os
 import sys
 import torch
 from diffusers import DiffusionPipeline, AutoencoderKL
+import peft
 
 # append project directory to path so predict.py can be imported
 sys.path.append('.')
