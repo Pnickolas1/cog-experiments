@@ -29,8 +29,10 @@ pipe = DiffusionPipeline.from_pretrained(
 )
 
 pipe.load_lora_weights(COLORING_BOOK_MODEL_NAME, weight_name=COLORING_BOOK_WEIGHTS_NAME, adapter_name="coloringbook")
-pipe.set_adapters("coloringbook", adapter_weights=1.0, adapter_names=["coloringbook"])
+pipe.set_adapters(["coloringbook"], adapter_weights=[1.0])
+#pipe.set_adapters("coloringbook", adapter_weights=1.0, adapter_names=["coloringbook"])  --> did not work
+#pipe.set_adapters(adapter_weights=1.0, adapter_names=["coloringbook"]) 
 # First, fuse the LoRA parameters.
 pipe.fuse_lora()
 
-pipe.save_pretrained(MODEL_CACHE, safe_serialization=True).to("cuda")
+pipe.save_pretrained(MODEL_CACHE, safe_serialization=True)
