@@ -25,7 +25,7 @@ from dataset_and_utils import (
 def main(
     pretrained_model_name_or_path: Optional[
         str
-    ] = "./model-cache",
+    ] = "./cache",  # "stabilityai/stable-diffusion-xl-base-1.0",
     revision: Optional[str] = None,
     instance_data_dir: Optional[str] = "./dataset/zeke/captions.csv",
     output_dir: str = "ft_masked_coke",
