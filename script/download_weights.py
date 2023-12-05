@@ -1,9 +1,6 @@
-
-
 # Run this before you deploy it on replicate, because if you don't
 # whenever you run the model, it will download the weights from the
 # internet, which will take a long time.
-
 import torch
 from diffusers import AutoencoderKL, DiffusionPipeline
 from diffusers.pipelines.stable_diffusion.safety_checker import (
@@ -60,8 +57,8 @@ safety = StableDiffusionSafetyChecker.from_pretrained(
     torch_dtype=torch.float16,
 )
 
-# pipe.load_lora_weights(COLORING_BOOK_MODEL_NAME, weight_name=COLORING_BOOK_WEIGHTS_NAME, adapter_name="coloringbook")
-# pipe.set_adapters("coloringbook")
+pipe.load_lora_weights(COLORING_BOOK_MODEL_NAME, weight_name=COLORING_BOOK_WEIGHTS_NAME, adapter_name="coloringbook")
+pipe.set_adapters("coloringbook")
 # #pipe.set_adapters("coloringbook", adapter_weights=1.0, adapter_names=["coloringbook"])  --> did not work
 # #pipe.set_adapters(adapter_weights=1.0, adapter_names=["coloringbook"]) 
 # # First, fuse the LoRA parameters.
