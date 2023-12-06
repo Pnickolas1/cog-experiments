@@ -202,6 +202,36 @@ class Predictor(BasePredictor):
             download_weights(SDXL_URL, SDXL_MODEL_CACHE)
 
         print("Loading sdxl txt2img pipeline...")
+        if not os.path.exists(SDXL_MODEL_CACHE):
+            download_weights(SDXL_URL, SDXL_MODEL_CACHE)
+        self.txt2img = DiffusionPipeline.from_pretrained(
+            SDXL_MODEL_CACHE,
+            variant="fp16",
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+        ).to("cuda")
+        self.original_scheduler = self.txt2img.scheduler
+        if weights:
+            self.load_lora_weights(str(weights))
+        else:
+            self.load_lora_weights(None)
+
+        self.txt2img.to("cuda")
+
+        if not os.path.exists(REFINER_MODEL_CACHE):
+            download_weights(REFINER_URL, REFINER_MODEL_CACHE)
+
+        print("Loading refiner pipeline...")
+        self.refiner = DiffusionPipeline.from_pretrained(
+            REFINER_MODEL_CACHE,
+            text_encoder_2=self.txt2img.text_encoder_2,
+            vae=self.txt2img.vae,
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+            variant="fp16",
+        ).to("cuda")
+
+        print("Loading sdxl txt2img pipeline...")
         self.txt2img_pipe = DiffusionPipeline.from_pretrained(
             SDXL_MODEL_CACHE,
             torch_dtype=torch.float16,
