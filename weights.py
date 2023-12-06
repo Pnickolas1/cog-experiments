@@ -121,6 +121,7 @@ class WeightsDownloadCache:
             print(output)
         except subprocess.CalledProcessError as e:
             # If download fails, clean up and re-raise exception
+            print('error in func: download_weights')
             print(e.output)
             self._rm_disk(dest)
             raise e
