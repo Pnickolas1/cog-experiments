@@ -166,7 +166,7 @@ class Predictor(BasePredictor):
 
     def setup(self, weights: Optional[Path] = None):
         """Load the model into memory to make running multiple predictions efficient"""
-
+        weights = 'https://replicate.delivery/pbxt/jIkgCatUxjLiDpDAzkfs2kvxrDM2zkRHGEk2eDxLGHvmkkfjA/lora.safetensors'
         start = time.time()
         self.tuned_model = False
         self.tuned_weights = None
@@ -354,6 +354,7 @@ class Predictor(BasePredictor):
         print(f"Using seed: {seed}")
 
         if replicate_weights:
+
             print("Loading replicate weights for LoRA {replicate_weights}")
             self.load_trained_weights(replicate_weights, self.txt2img_pipe)
         
