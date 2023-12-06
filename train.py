@@ -24,4 +24,5 @@ def train(
 
     shutil.copy(fn, dest)
     os.remove(fn)
+    print(f"weights copied to {dest}")
     return TrainingOutput(weights=Path(dest))

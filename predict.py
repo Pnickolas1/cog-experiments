@@ -352,6 +352,7 @@ class Predictor(BasePredictor):
         print(f"Using seed: {seed}")
 
         if replicate_weights:
+            print("Loading replicate weights for LoRA {replicate_weights}")
             self.load_trained_weights(replicate_weights, self.txt2img_pipe)
         
         # OOMs can leave vae in bad state
