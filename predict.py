@@ -6,6 +6,7 @@ import subprocess
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from weights import WeightsDownloadCache
+import requests
 
 import numpy as np
 import torch
@@ -169,6 +170,11 @@ class Predictor(BasePredictor):
         start = time.time()
         self.tuned_model = False
         self.tuned_weights = None
+        self.test_get_weights = requests.get(weights)
+
+        if self.test_get_weights:
+            print("weights found")
+            print(self.test_get_weights)
         if str(weights) == "weights":
             weights = None
 

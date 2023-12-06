@@ -4,6 +4,9 @@ import shutil
 from huggingface_hub import hf_hub_download
 from cog import BaseModel, Input, Path
 
+from predict import SDXL_MODEL_CACHE, SDXL_URL, download_weights
+OUTPUT_DIR = "training_out"
+
 class TrainingOutput(BaseModel):
     weights: Path
 
@@ -16,7 +19,7 @@ def train(
         ),
 ) -> TrainingOutput:
 
-    dest =  'lora.safetensors'
+    dest = 'lora.safetensors'
     if os.path.exists(dest):
         os.remove(dest)
     
