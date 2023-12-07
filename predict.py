@@ -236,8 +236,8 @@ class Predictor(BasePredictor):
             variant="fp16",
         )
         self.is_lora = False
-        if weights or os.path.exists("./trained-model"):
-            self.load_trained_weights(weights, self.txt2img_pipe)
+        # if weights or os.path.exists("./trained-model"):
+        #     self.load_trained_weights(weights, self.txt2img_pipe)
 
         self.txt2img_pipe.to("cuda")
 
@@ -433,9 +433,9 @@ class Predictor(BasePredictor):
 
         self.load_lora_weights(replicate_weights)
         # self.txt2img.set_adapters(['style'], adapter_weights=[style_scale])
-        if replicate_weights:
-            print("Loading replicate weights for LoRA {replicate_weights}")
-            self.load_trained_weights(replicate_weights, self.txt2img_pipe)
+        # if replicate_weights:
+        #     print("Loading replicate weights for LoRA {replicate_weights}")
+        #     self.load_trained_weights(replicate_weights, self.txt2img_pipe)
         
         # OOMs can leave vae in bad state
         if self.txt2img_pipe.vae.dtype == torch.float32:
