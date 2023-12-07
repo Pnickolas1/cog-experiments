@@ -649,8 +649,7 @@ class Predictor(BasePredictor):
         if weights_url != self.lora_url:
             self.txt2img.unload_lora_weights()
 
-            self.txt2img.load_lora_weights(lcm_lora_id, adapter_name="lcm")
-
+            # self.txt2img.load_lora_weights(lcm_lora_id, adapter_name="lcm")
             if weights_url:
                 if os.path.exists("style-lora.safetensors"):
                     os.remove("style-lora.safetensors")
@@ -660,21 +659,21 @@ class Predictor(BasePredictor):
             else:
                 self.lora_url = None
 
-        enable_lcm = lcm_scale > 0.0
+        # enable_lcm = lcm_scale > 0.0
 
-        if enable_lcm:
-            self.txt2img.scheduler = LCMScheduler.from_config(self.original_scheduler.config)
-        else:
-            self.txt2img.scheduler = SCHEDULERS[scheduler].from_config(self.original_scheduler.config)
+        # if enable_lcm:
+        #     self.txt2img.scheduler = LCMScheduler.from_config(self.original_scheduler.config)
+        # else:
+        #     self.txt2img.scheduler = SCHEDULERS[scheduler].from_config(self.original_scheduler.config)
 
-        if enable_lcm and weights_url:
-            self.txt2img.set_adapters(["lcm", "style"], adapter_weights=[lcm_scale, style_scale])
-        elif enable_lcm:
-            self.txt2img.set_adapters(["lcm"], adapter_weights=[lcm_scale])
-        elif enable_lcm:
-            self.txt2img.set_adapters(["style"], adapter_weights=[style_scale])
-        else:
-            self.txt2img.set_adapters([])
+        # if enable_lcm and weights_url:
+        #     self.txt2img.set_adapters(["lcm", "style"], adapter_weights=[lcm_scale, style_scale])
+        # elif enable_lcm:
+        #     self.txt2img.set_adapters(["lcm"], adapter_weights=[lcm_scale])
+        # elif enable_lcm:
+        #     self.txt2img.set_adapters(["style"], adapter_weights=[style_scale])
+        # else:
+        #     self.txt2img.set_adapters([])
 
 
     def run_safety_checker(self, image):
@@ -771,7 +770,8 @@ class Predictor(BasePredictor):
             seed = int.from_bytes(os.urandom(2), "big")
         print(f"Using seed: {seed}")
 
-        self.load_lora_weights(replicate_weights, lcm_scale, style_scale, scheduler)
+        #self.load_lora_weights(replicate_weights, lcm_scale, style_scale, scheduler)
+        self.load_lora_weights(replicate_weights)
 
         # OOMs can leave vae in bad state
         if self.txt2img.vae.dtype == torch.float32:
