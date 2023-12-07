@@ -435,7 +435,7 @@ class Predictor(BasePredictor):
         print(f"Using seed: {seed}")
 
         self.load_lora_weights(replicate_weights)
-        self.txt2img.set_adapters(['style'], adapter_weights=[style_scale])
+        # self.txt2img.set_adapters(['style'], adapter_weights=[style_scale])
         if replicate_weights:
             print("Loading replicate weights for LoRA {replicate_weights}")
             self.load_trained_weights(replicate_weights, self.txt2img_pipe)
