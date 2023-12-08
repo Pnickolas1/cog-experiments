@@ -166,6 +166,8 @@ class Predictor(BasePredictor):
     def setup(self, weights: Optional[Path] = None):
         """Load the model into memory to make running multiple predictions efficient"""
         # weights = 'https://replicate.delivery/pbxt/jIkgCatUxjLiDpDAzkfs2kvxrDM2zkRHGEk2eDxLGHvmkkfjA/lora.safetensors'
+        print("Setting up predictor...")
+        print('weights: ', weights)
         start = time.time()
         self.tuned_model = False
         self.tuned_weights = None
