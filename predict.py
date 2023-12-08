@@ -49,8 +49,6 @@ COLORING_BOOK_MODEL_NAME = "artificialguybr/ColoringBookRedmond-V2"
 COLORING_BOOK_WEIGHTS_NAME = "ColoringBookRedmond-ColoringBook-ColoringBookAF.safetensors"
 MODEL_CACHE = "model-cache"
 
-
-
 class KarrasDPM:
     def from_config(config):
         return DPMSolverMultistepScheduler.from_config(config, use_karras_sigmas=True)
@@ -66,14 +64,16 @@ SCHEDULERS = {
     "PNDM": PNDMScheduler,
 }
 
-
-def download_weights(url, dest):
+def download_weights(url, dest, extract=True):
     start = time.time()
     print("downloading url: ", url)
     print("downloading to: ", dest)
-    subprocess.check_call(["pget", "-x", url, dest], close_fds=False)
+    if extract:
+        cmd = ["pget", "-x", url, dest]
+    else:
+        cmd = ["pget", url, dest]
+    subprocess.check_call(cmd, close_fds=False)
     print("downloading took: ", time.time() - start)
-
 
 class Predictor(BasePredictor):
     def load_trained_weights(self, weights, pipe):
@@ -165,10 +165,13 @@ class Predictor(BasePredictor):
 
     def setup(self, weights: Optional[Path] = None):
         """Load the model into memory to make running multiple predictions efficient"""
-
+        # weights = 'https://replicate.delivery/pbxt/jIkgCatUxjLiDpDAzkfs2kvxrDM2zkRHGEk2eDxLGHvmkkfjA/lora.safetensors'
         start = time.time()
         self.tuned_model = False
         self.tuned_weights = None
+
+        self.lora_url = 'setup'  # this allows us to load the weights on the first run
+
         if str(weights) == "weights":
             weights = None
 
@@ -186,6 +189,36 @@ class Predictor(BasePredictor):
             download_weights(SDXL_URL, SDXL_MODEL_CACHE)
 
         print("Loading sdxl txt2img pipeline...")
+        if not os.path.exists(SDXL_MODEL_CACHE):
+            download_weights(SDXL_URL, SDXL_MODEL_CACHE)
+        self.txt2img = DiffusionPipeline.from_pretrained(
+            SDXL_MODEL_CACHE,
+            variant="fp16",
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+        ).to("cuda")
+        self.original_scheduler = self.txt2img.scheduler
+        if weights:
+            self.load_lora_weights(str(weights))
+        else:
+            self.load_lora_weights(None)
+
+        self.txt2img.to("cuda")
+
+        if not os.path.exists(REFINER_MODEL_CACHE):
+            download_weights(REFINER_URL, REFINER_MODEL_CACHE)
+
+        print("Loading refiner pipeline...")
+        self.refiner = DiffusionPipeline.from_pretrained(
+            REFINER_MODEL_CACHE,
+            text_encoder_2=self.txt2img.text_encoder_2,
+            vae=self.txt2img.vae,
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+            variant="fp16",
+        ).to("cuda")
+
+        print("Loading sdxl txt2img pipeline...")
         self.txt2img_pipe = DiffusionPipeline.from_pretrained(
             SDXL_MODEL_CACHE,
             torch_dtype=torch.float16,
@@ -193,8 +226,8 @@ class Predictor(BasePredictor):
             variant="fp16",
         )
         self.is_lora = False
-        if weights or os.path.exists("./trained-model"):
-            self.load_trained_weights(weights, self.txt2img_pipe)
+        # if weights or os.path.exists("./trained-model"):
+        #     self.load_trained_weights(weights, self.txt2img_pipe)
 
         self.txt2img_pipe.to("cuda")
 
@@ -247,6 +280,35 @@ class Predictor(BasePredictor):
     def load_image(self, path):
         shutil.copyfile(path, "/tmp/image.png")
         return load_image("/tmp/image.png").convert("RGB")
+
+    def load_lora_weights(self, weights_url, lcm_scale=1.0, style_scale=0.8, scheduler="DDIM"):
+        if weights_url != self.lora_url:
+            self.txt2img.unload_lora_weights()
+            # self.txt2img.load_lora_weights(lcm_lora_id, adapter_name="lcm")
+            if weights_url:
+                if os.path.exists("style-lora.safetensors"):
+                    os.remove("style-lora.safetensors")
+                download_weights(weights_url, "style-lora.safetensors", extract=False)
+                self.txt2img.load_lora_weights("style-lora.safetensors", adapter_name="style")
+                self.lora_url = weights_url
+            else:
+                self.lora_url = None
+
+        # enable_lcm = lcm_scale > 0.0
+
+        # if enable_lcm:
+        #     self.txt2img.scheduler = LCMScheduler.from_config(self.original_scheduler.config)
+        # else:
+        #     self.txt2img.scheduler = SCHEDULERS[scheduler].from_config(self.original_scheduler.config)
+
+        # if enable_lcm and weights_url:
+        #     self.txt2img.set_adapters(["lcm", "style"], adapter_weights=[lcm_scale, style_scale])
+        # elif enable_lcm:
+        #     self.txt2img.set_adapters(["lcm"], adapter_weights=[lcm_scale])
+        # elif enable_lcm:
+        #     self.txt2img.set_adapters(["style"], adapter_weights=[style_scale])
+        # else:
+        #     self.txt2img.set_adapters([])
 
     def run_safety_checker(self, image):
         safety_checker_input = self.feature_extractor(image, return_tensors="pt").to(
@@ -344,15 +406,31 @@ class Predictor(BasePredictor):
         disable_safety_checker: bool = Input(
             description="Disable safety checker for generated images. This feature is only available through the API. See [https://replicate.com/docs/how-does-replicate-work#safety](https://replicate.com/docs/how-does-replicate-work#safety)",
             default=False
-        )
+        ),
+        lcm_scale: float = Input(
+            description="Scale for LCM, if 0, the DDIM scheduler is used",
+            default=1.0,
+        ),
+        style_scale: float = Input(
+            description="Scale for style LoRA",
+            default=0.8,
+        ),
     ) -> List[Path]:
         """Run a single prediction on the model."""
         if seed is None:
             seed = int.from_bytes(os.urandom(2), "big")
         print(f"Using seed: {seed}")
+        print(f"Using lcm scale: {lcm_scale}")
+        print(f"Using style scale: {style_scale}")
+        print(f"Using scheduler: {scheduler}")
+        print(f"Using lora_scale: ", {lora_scale})
 
-        if replicate_weights:
-            self.load_trained_weights(replicate_weights, self.txt2img_pipe)
+
+        self.load_lora_weights(replicate_weights)
+        # self.txt2img.set_adapters(['style'], adapter_weights=[style_scale])
+        # if replicate_weights:
+        #     print("Loading replicate weights for LoRA {replicate_weights}")
+        #     self.load_trained_weights(replicate_weights, self.txt2img_pipe)
         
         # OOMs can leave vae in bad state
         if self.txt2img_pipe.vae.dtype == torch.float32:

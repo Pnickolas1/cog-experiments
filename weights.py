@@ -117,10 +117,12 @@ class WeightsDownloadCache:
         st = time.time()
         # maybe retry with the real url if this doesn't work
         try:
-            output = subprocess.check_output(["pget", "-x", url, dest], close_fds=True)
+            # output = subprocess.check_output(["pget", "-x", url, dest], close_fds=True)
+            output = subprocess.check_output(["pget", url, dest], close_fds=True)
             print(output)
         except subprocess.CalledProcessError as e:
             # If download fails, clean up and re-raise exception
+            print('error in func: download_weights')
             print(e.output)
             self._rm_disk(dest)
             raise e
