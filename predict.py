@@ -64,14 +64,6 @@ SCHEDULERS = {
     "PNDM": PNDMScheduler,
 }
 
-
-# def download_weights(url, dest):
-#     start = time.time()
-#     print("downloading url: ", url)
-#     print("downloading to: ", dest)
-#     subprocess.check_call(["pget", "-x", url, dest], close_fds=False)
-#     print("downloading took: ", time.time() - start)
-
 def download_weights(url, dest, extract=True):
     start = time.time()
     print("downloading url: ", url)
@@ -82,8 +74,6 @@ def download_weights(url, dest, extract=True):
         cmd = ["pget", url, dest]
     subprocess.check_call(cmd, close_fds=False)
     print("downloading took: ", time.time() - start)
-
-
 
 class Predictor(BasePredictor):
     def load_trained_weights(self, weights, pipe):
@@ -430,6 +420,11 @@ class Predictor(BasePredictor):
         if seed is None:
             seed = int.from_bytes(os.urandom(2), "big")
         print(f"Using seed: {seed}")
+        print(f"Using lcm scale: {lcm_scale}")
+        print(f"Using style scale: {style_scale}")
+        print(f"Using scheduler: {scheduler}")
+        print(f"Using lora_scale: ", {lora_scale})
+
 
         self.load_lora_weights(replicate_weights)
         # self.txt2img.set_adapters(['style'], adapter_weights=[style_scale])
