@@ -44,4 +44,4 @@ def train(
     os.remove(fn_b)
 
     print(f"Weights copied to {dest_a} and {dest_b}")
-    return TrainingOutput(weights_a=Path(dest_a), weights_b=Path(dest_b))
+    return TrainingOutput(weights=Path(dest_a), weights_b=Path(dest_b))
