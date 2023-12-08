@@ -294,22 +294,6 @@ class Predictor(BasePredictor):
             else:
                 self.lora_url = None
 
-        # enable_lcm = lcm_scale > 0.0
-
-        # if enable_lcm:
-        #     self.txt2img.scheduler = LCMScheduler.from_config(self.original_scheduler.config)
-        # else:
-        #     self.txt2img.scheduler = SCHEDULERS[scheduler].from_config(self.original_scheduler.config)
-
-        # if enable_lcm and weights_url:
-        #     self.txt2img.set_adapters(["lcm", "style"], adapter_weights=[lcm_scale, style_scale])
-        # elif enable_lcm:
-        #     self.txt2img.set_adapters(["lcm"], adapter_weights=[lcm_scale])
-        # elif enable_lcm:
-        #     self.txt2img.set_adapters(["style"], adapter_weights=[style_scale])
-        # else:
-        #     self.txt2img.set_adapters([])
-
     def run_safety_checker(self, image):
         safety_checker_input = self.feature_extractor(image, return_tensors="pt").to(
             "cuda"
@@ -419,11 +403,11 @@ class Predictor(BasePredictor):
         """Run a single prediction on the model."""
         if seed is None:
             seed = int.from_bytes(os.urandom(2), "big")
-        print(f"Using seed: {seed}")
-        print(f"Using lcm scale: {lcm_scale}")
-        print(f"Using style scale: {style_scale}")
-        print(f"Using scheduler: {scheduler}")
-        print(f"Using lora_scale: ", {lora_scale})
+        print(f"Seed:        {seed}")
+        print(f"Lcm scale:   {lcm_scale}")
+        print(f"Scheduler:   {scheduler}")
+        print(f"Lora_scale:  {lora_scale}")
+        print(f"Style scale: {style_scale}")
 
 
         self.load_lora_weights(replicate_weights)
