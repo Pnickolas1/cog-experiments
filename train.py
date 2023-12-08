@@ -8,7 +8,7 @@ from predict import SDXL_MODEL_CACHE, SDXL_URL, download_weights
 OUTPUT_DIR = "training_out"
 
 class TrainingOutput(BaseModel):
-    weights_a: Path
+    weights: Path
     weights_b: Path
 
 def train(
