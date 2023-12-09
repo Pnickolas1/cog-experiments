@@ -288,9 +288,9 @@ class Predictor(BasePredictor):
             self.txt2img.unload_lora_weights()
             # self.txt2img.load_lora_weights(lcm_lora_id, adapter_name="lcm")
             if weights_url:
-                if os.path.exists("style-lora.safetensors"):
-                    os.remove("style-lora.safetensors")
-                download_weights(weights_url, "style-lora.safetensors", extract=False)
+                if os.path.exists("combined_weights/style-lora.safetensors"):
+                    os.remove("combined_weights/style-lora.safetensors")
+                download_weights(weights_url, "combined_weights/style-lora.safetensors", extract=False)
                 self.txt2img.load_lora_weights("style-lora.safetensors", adapter_name="style")
                 self.lora_url = weights_url
             else:
