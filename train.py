@@ -4,12 +4,11 @@ from huggingface_hub import hf_hub_download
 from cog import BaseModel, Input, Path
 
 from predict import SDXL_MODEL_CACHE, SDXL_URL, download_weights
-OUTPUT_DIR = "training_out"
-
 import shutil
 import tarfile
 from preprocess import preprocess
 from trainer_pti import main
+OUTPUT_DIR = "training_out"
 
 # class TrainingOutput(BaseModel):
 #     weights: Path
@@ -53,7 +52,6 @@ from trainer_pti import main
 """
 Wrapper around actual trainer.
 """
-OUTPUT_DIR = "training_out"
 
 
 class TrainingOutput(BaseModel):
