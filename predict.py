@@ -6,7 +6,6 @@ import subprocess
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from weights import WeightsDownloadCache
-
 import numpy as np
 import torch
 from cog import BasePredictor, Input, Path
@@ -29,8 +28,11 @@ from diffusers.utils import load_image
 from safetensors import safe_open
 from safetensors.torch import load_file
 from transformers import CLIPImageProcessor
+os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 
 from dataset_and_utils import TokenEmbeddingsHandler
+
+from huggingface_hub import hf_hub_download
 
 SDXL_MODEL_CACHE = "./sdxl-cache"
 REFINER_MODEL_CACHE = "./refiner-cache"
@@ -162,6 +164,21 @@ class Predictor(BasePredictor):
     #     self.token_map = params
 
     #     self.tuned_model = True
+
+    def download_coloring_book_weights(self):
+        try:
+            dest_a = 'style.safetensors'
+            # Download and save first set of weights
+            if os.path.exists(dest_a):
+                os.remove(dest_a)
+            fn_a = hf_hub_download(repo_id=COLORING_BOOK_MODEL_NAME, filename=COLORING_BOOK_WEIGHTS_NAME)
+            print("fn_a: ", fn_a)
+            shutil.copy(fn_a, dest_a)
+            os.remove(fn_a)
+
+        except Exception as e:
+            print("Error downloading coloring book weights: ", e)
+            fn = None
 
     def setup(self, weights: Optional[Path] = None):
         """Load the model into memory to make running multiple predictions efficient"""
