@@ -409,32 +409,15 @@ class Predictor(BasePredictor):
         disable_safety_checker: bool = Input(
             description="Disable safety checker for generated images. This feature is only available through the API. See [https://replicate.com/docs/how-does-replicate-work#safety](https://replicate.com/docs/how-does-replicate-work#safety)",
             default=False
-        ),
-        lcm_scale: float = Input(
-            description="Scale for LCM, if 0, the DDIM scheduler is used",
-            default=1.0,
-        ),
-        style_scale: float = Input(
-            description="Scale for style LoRA",
-            default=0.8,
-        ),
+        )
     ) -> List[Path]:
         """Run a single prediction on the model."""
         if seed is None:
             seed = int.from_bytes(os.urandom(2), "big")
-        print(f"Seed:        {seed}")
-        print(f"Lcm scale:   {lcm_scale}")
-        print(f"Scheduler:   {scheduler}")
-        print(f"Lora_scale:  {lora_scale}")
-        print(f"Style scale: {style_scale}")
-        print(f"Replicate weights: {replicate_weights}")
+        print(f"Using seed: {seed}")
 
-
-        # self.load_lora_weights(replicate_weights)
-        # self.txt2img.set_adapters(['style'], adapter_weights=[style_scale])
-        # if replicate_weights:
-        #     print("Loading replicate weights for LoRA {replicate_weights}")
-        #     self.load_trained_weights(replicate_weights, self.txt2img_pipe)
+        if replicate_weights:
+            self.load_trained_weights(replicate_weights, self.txt2img_pipe)
         
         # OOMs can leave vae in bad state
         if self.txt2img_pipe.vae.dtype == torch.float32:
