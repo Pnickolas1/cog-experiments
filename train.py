@@ -160,6 +160,7 @@ def train(
         choices=["zip", "tar", "infer"],
     ),
 ) -> TrainingOutput:
+    print('Training started....')
     # Hard-code token_map for now. Make it configurable once we support multiple concepts or user-uploaded caption csv.
     token_map = token_string + ":2"
 
