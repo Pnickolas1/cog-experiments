@@ -6,7 +6,6 @@ import subprocess
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from weights import WeightsDownloadCache
-
 import numpy as np
 import torch
 from cog import BasePredictor, Input, Path
@@ -29,8 +28,11 @@ from diffusers.utils import load_image
 from safetensors import safe_open
 from safetensors.torch import load_file
 from transformers import CLIPImageProcessor
+os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 
 from dataset_and_utils import TokenEmbeddingsHandler
+
+from huggingface_hub import hf_hub_download
 
 SDXL_MODEL_CACHE = "./sdxl-cache"
 REFINER_MODEL_CACHE = "./refiner-cache"
@@ -42,6 +44,12 @@ REFINER_URL = (
 )
 SAFETY_URL = "https://weights.replicate.delivery/default/sdxl/safety-1.0.tar"
 
+
+MODEL_NAME = "SG161222/RealVisXL_V2.0"
+SDXL = 'stabilityai/stable-diffusion-xl-base-1.0'
+COLORING_BOOK_MODEL_NAME = "artificialguybr/ColoringBookRedmond-V2"
+COLORING_BOOK_WEIGHTS_NAME = "ColoringBookRedmond-ColoringBook-ColoringBookAF.safetensors"
+MODEL_CACHE = "model-cache"
 
 class KarrasDPM:
     def from_config(config):
@@ -58,14 +66,16 @@ SCHEDULERS = {
     "PNDM": PNDMScheduler,
 }
 
-
-def download_weights(url, dest):
+def download_weights(url, dest, extract=True):
     start = time.time()
     print("downloading url: ", url)
     print("downloading to: ", dest)
-    subprocess.check_call(["pget", "-x", url, dest], close_fds=False)
+    if extract:
+        cmd = ["pget", "-x", url, dest]
+    else:
+        cmd = ["pget", url, dest]
+    subprocess.check_call(cmd, close_fds=False)
     print("downloading took: ", time.time() - start)
-
 
 class Predictor(BasePredictor):
     def load_trained_weights(self, weights, pipe):
@@ -155,17 +165,37 @@ class Predictor(BasePredictor):
 
         self.tuned_model = True
 
+    def download_coloring_book_weights(self):
+        try:
+            dest_a = 'style.safetensors'
+            # Download and save first set of weights
+            if os.path.exists(dest_a):
+                os.remove(dest_a)
+            fn_a = hf_hub_download(repo_id=COLORING_BOOK_MODEL_NAME, filename=COLORING_BOOK_WEIGHTS_NAME)
+            print("fn_a: ", fn_a)
+            shutil.copy(fn_a, dest_a)
+            os.remove(fn_a)
+
+        except Exception as e:
+            print("Error downloading coloring book weights: ", e)
+            fn = None
+
     def setup(self, weights: Optional[Path] = None):
         """Load the model into memory to make running multiple predictions efficient"""
-
+        # weights = 'https://replicate.delivery/pbxt/jIkgCatUxjLiDpDAzkfs2kvxrDM2zkRHGEk2eDxLGHvmkkfjA/lora.safetensors'
+        print("Setting up predictor...")
+        print('weights: ', weights)
         start = time.time()
         self.tuned_model = False
         self.tuned_weights = None
+
+        self.lora_url = 'setup'  # this allows us to load the weights on the first run
+
         if str(weights) == "weights":
             weights = None
 
         self.weights_cache = WeightsDownloadCache()
-
+    
         print("Loading safety checker...")
         if not os.path.exists(SAFETY_CACHE):
             download_weights(SAFETY_URL, SAFETY_CACHE)
@@ -176,6 +206,36 @@ class Predictor(BasePredictor):
 
         if not os.path.exists(SDXL_MODEL_CACHE):
             download_weights(SDXL_URL, SDXL_MODEL_CACHE)
+
+        print("Loading sdxl txt2img pipeline...")
+        if not os.path.exists(SDXL_MODEL_CACHE):
+            download_weights(SDXL_URL, SDXL_MODEL_CACHE)
+        self.txt2img = DiffusionPipeline.from_pretrained(
+            SDXL_MODEL_CACHE,
+            variant="fp16",
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+        ).to("cuda")
+        self.original_scheduler = self.txt2img.scheduler
+        if weights:
+            self.load_lora_weights(str(weights))
+        else:
+            self.load_lora_weights(None)
+
+        self.txt2img.to("cuda")
+
+        if not os.path.exists(REFINER_MODEL_CACHE):
+            download_weights(REFINER_URL, REFINER_MODEL_CACHE)
+
+        print("Loading refiner pipeline...")
+        self.refiner = DiffusionPipeline.from_pretrained(
+            REFINER_MODEL_CACHE,
+            text_encoder_2=self.txt2img.text_encoder_2,
+            vae=self.txt2img.vae,
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+            variant="fp16",
+        ).to("cuda")
 
         print("Loading sdxl txt2img pipeline...")
         self.txt2img_pipe = DiffusionPipeline.from_pretrained(
@@ -239,6 +299,19 @@ class Predictor(BasePredictor):
     def load_image(self, path):
         shutil.copyfile(path, "/tmp/image.png")
         return load_image("/tmp/image.png").convert("RGB")
+
+    def load_lora_weights_from_hf(self, weights_url, lcm_scale=1.0, style_scale=0.8, scheduler="DDIM"):
+        if weights_url != self.lora_url:
+            self.txt2img.unload_lora_weights()
+            # self.txt2img.load_lora_weights(lcm_lora_id, adapter_name="lcm")
+            if weights_url:
+                if os.path.exists("style-lora.safetensors"):
+                    os.remove("style-lora.safetensors")
+                download_weights(weights_url, "style-lora.safetensors", extract=False)
+                self.txt2img.load_lora_weights("style-lora.safetensors", adapter_name="style")
+                self.lora_url = weights_url
+            else:
+                self.lora_url = None
 
     def run_safety_checker(self, image):
         safety_checker_input = self.feature_extractor(image, return_tensors="pt").to(
