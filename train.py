@@ -3,7 +3,7 @@ os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 from huggingface_hub import hf_hub_download
 from cog import BaseModel, Input, Path
 
-from predict import SDXL_MODEL_CACHE, SDXL_URL, download_weights
+from predict import SDXL_MODEL_CACHE, SDXL_URL, download_weights, COLORING_BOOK_REDMOND, COLORING_BOOK_TENSORS
 import shutil
 import tarfile
 from preprocess import preprocess
@@ -229,10 +229,22 @@ def train(
     directory = Path(OUTPUT_DIR)
     out_path = "trained_model.tar"
 
+    dest_a = 'styles.safetensors'
+
+    # Download and save first set of weights
+    if os.path.exists(dest_a):
+        os.remove(dest_a)
+    fn_a = hf_hub_download(repo_id=COLORING_BOOK_REDMOND, filename=COLORING_BOOK_TENSORS)
+    shutil.copy(fn_a, dest_a)
+    os.remove(fn_a)
+
     with tarfile.open(out_path, "w") as tar:
+        tar.add(dest_a, arcname="styles_test.safetensors")
+
         for file_path in directory.rglob("*"):
             print(file_path)
             arcname = file_path.relative_to(directory)
+            print('arcname: ', arcname)
             tar.add(file_path, arcname=arcname)
 
     return TrainingOutput(weights=Path(out_path))

@@ -31,7 +31,7 @@ from safetensors.torch import load_file
 from transformers import CLIPImageProcessor
 
 from dataset_and_utils import TokenEmbeddingsHandler
-
+STLYE_CACHE = "./style-cache"
 SDXL_MODEL_CACHE = "./sdxl-cache"
 REFINER_MODEL_CACHE = "./refiner-cache"
 SAFETY_CACHE = "./safety-cache"
@@ -42,6 +42,8 @@ REFINER_URL = (
 )
 SAFETY_URL = "https://weights.replicate.delivery/default/sdxl/safety-1.0.tar"
 
+COLORING_BOOK_REDMOND = "artificialguybr/ColoringBookRedmond-V2"
+COLORING_BOOK_TENSORS = "ColoringBookRedmond-ColoringBook-ColoringBookAF.safetensors"
 
 class KarrasDPM:
     def from_config(config):
@@ -173,6 +175,11 @@ class Predictor(BasePredictor):
             SAFETY_CACHE, torch_dtype=torch.float16
         ).to("cuda")
         self.feature_extractor = CLIPImageProcessor.from_pretrained(FEATURE_EXTRACTOR)
+
+        if not os.path.exists(STLYE_CACHE):
+            print('hey you have hit the style cache')
+        else:
+            print('you have not hit the style cache')
 
         if not os.path.exists(SDXL_MODEL_CACHE):
             download_weights(SDXL_URL, SDXL_MODEL_CACHE)
