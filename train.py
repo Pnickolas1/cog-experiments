@@ -235,16 +235,28 @@ def train(
     if os.path.exists(dest_a):
         os.remove(dest_a)
     fn_a = hf_hub_download(repo_id=COLORING_BOOK_REDMOND, filename=COLORING_BOOK_TENSORS)
+    print('fn_a: ', fn_a)
     shutil.copy(fn_a, dest_a)
     os.remove(fn_a)
 
-    with tarfile.open(out_path, "w") as tar:
-        tar.add(dest_a, arcname="styles_test.safetensors")
+    # with tarfile.open(out_path, "w") as tar:
 
+    #     for file_path in directory.rglob("*"):
+    #         print('file_path', file_path)
+    #         arcname = file_path.relative_to(directory)
+    #         print('arcname: ', arcname)
+    #         tar.add(file_path, arcname=arcname)
+
+    with tarfile.open(out_path, "w") as tar:
+        # Add files from the directory
         for file_path in directory.rglob("*"):
-            print(file_path)
+            print('file_path', file_path)
             arcname = file_path.relative_to(directory)
             print('arcname: ', arcname)
             tar.add(file_path, arcname=arcname)
+        
+        # Explicitly add dest_a to the tar file
+        arcname_dest_a = dest_a  # or any other relative path you prefer
+        tar.add(dest_a, arcname=arcname_dest_a)
 
     return TrainingOutput(weights=Path(out_path))
