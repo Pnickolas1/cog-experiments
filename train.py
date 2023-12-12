@@ -259,4 +259,11 @@ def train(
         arcname_dest_a = dest_a  # or any other relative path you prefer
         tar.add(dest_a, arcname=arcname_dest_a)
 
+    # Open the tar file
+    with tarfile.open(out_path, 'r') as tar:
+        # List each member of the tar file
+        print('opening tar file')
+        for member in tar.getmembers():
+            print(member.name)
+
     return TrainingOutput(weights=Path(out_path))
