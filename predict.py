@@ -68,8 +68,32 @@ def download_weights(url, dest):
     subprocess.check_call(["pget", "-x", url, dest], close_fds=False)
     print("downloading took: ", time.time() - start)
 
+def download_coloring_book_weights(url, dest, extract=True):
+    print("downloading coloring book weights")
+    start = time.time()
+    print("downloading url: ", url)
+    print("downloading to: ", dest)
+    if extract:
+        cmd = ["pget", "-x", url, dest]
+    else:
+        cmd = ["pget", url, dest]
+    subprocess.check_call(cmd, close_fds=False)
+    print("downloading took: ", time.time() - start)
 
 class Predictor(BasePredictor):
+    def load_lora_weights_from_hf(self, weights_url, pipe, lcm_scale=1.0, style_scale=0.8, scheduler="DDIM"):
+        if weights_url != self.style_lora_url:
+            pipe.unload_lora_weights()
+            # self.txt2img.load_lora_weights(lcm_lora_id, adapter_name="lcm")
+            if weights_url:
+                if os.path.exists("styles.safetensors"):
+                    os.remove("styles.safetensors")
+                download_coloring_book_weights(weights_url, "styles.safetensors", extract=False)
+                pipe.load_lora_weights("styles.safetensors", adapter_name="style")
+                self.style_lora_url = weights_url
+            else:
+                self.style_lora_url = None
+
     def load_trained_weights(self, weights, pipe):
         from no_init import no_init_or_tensor
 
@@ -163,6 +187,7 @@ class Predictor(BasePredictor):
         start = time.time()
         self.tuned_model = False
         self.tuned_weights = None
+        self.style_tuned_weights = None
         if str(weights) == "weights":
             weights = None
 
@@ -192,8 +217,17 @@ class Predictor(BasePredictor):
             variant="fp16",
         )
         self.is_lora = False
+
+        if os.path.exists("./trained-model"):
+            print("Contents of 'trained-model' directory:")
+            for filename in os.listdir("./trained-model"):
+                print('filename: ', filename)
+
         if weights or os.path.exists("./trained-model"):
             self.load_trained_weights(weights, self.txt2img_pipe)
+
+        if weights or os.path.exists("./trained-model"):
+            self.load_lora_weights_from_hf(weights, self.txt2img_pipe)
 
         self.txt2img_pipe.to("cuda")
 
