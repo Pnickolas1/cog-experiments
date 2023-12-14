@@ -137,7 +137,7 @@ class Predictor(BasePredictor):
             unet = pipe.unet
 
             tensors = load_file(os.path.join(local_weights_cache, "styles.safetensors"))
-            pipe.load_lora_weights("styles.safetensors", adapter_name="style")
+            pipe.load_lora_weights(tensors, adapter_name="style")
             unet_lora_attn_procs = {}
             name_rank_map = {}
             # for tk, tv in tensors.items():
