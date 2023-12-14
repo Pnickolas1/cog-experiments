@@ -240,6 +240,7 @@ class Predictor(BasePredictor):
                 print('filename: ', filename)
 
         if weights:
+            print('loading traing weights')
             self.load_trained_weights(weights, self.txt2img_pipe)
 
         # if weights:
