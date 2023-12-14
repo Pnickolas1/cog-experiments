@@ -81,25 +81,112 @@ def download_coloring_book_weights(url, dest, extract=True):
     print("downloading took: ", time.time() - start)
 
 class Predictor(BasePredictor):
-    def load_lora_weights_from_hf(self, weights_url, pipe, lcm_scale=1.0, style_scale=0.8, scheduler="DDIM"):
-        try:
-            print('load_lora_weights_from_hf')
-            # if weights_url != self.style_lora_url:
-            print('inside the if statement')
-            pipe.unload_lora_weights()
-            # self.txt2img.load_lora_weights(lcm_lora_id, adapter_name="lcm")
-            if weights_url:
-                # if os.path.exists("styles.safetensors"):
-                #     # os.remove("styles.safetensors")
-                #     print('styles.safetensors exists')
-                # download_coloring_book_weights(weights_url, "styles.safetensors", extract=True)
-                print('here is the weights url: ', weights_url)
-                pipe.load_lora_weights("styles.safetensors", adapter_name="style")
-                    # self.style_lora_url = weights_url
-                # else:
-                #     self.style_lora_url = None
-        except Exception as e:
-            print('error in load_lora_weights_from_hf: ', e)
+    def load_lora_stlye_weights(self, weights, pipe, lcm_scale=1.0, style_scale=0.8, scheduler="DDIM"):
+        # try:
+        #     print('load_lora_weights_from_hf')
+        #     # if weights_url != self.style_lora_url:
+        #     print('inside the if statement')
+        #     pipe.unload_lora_weights()
+        #     # self.txt2img.load_lora_weights(lcm_lora_id, adapter_name="lcm")
+        #     if weights_url:
+        #         # if os.path.exists("styles.safetensors"):
+        #         #     # os.remove("styles.safetensors")
+        #         #     print('styles.safetensors exists')
+        #         # download_coloring_book_weights(weights_url, "styles.safetensors", extract=True)
+        #         print('here is the weights url: ', weights_url)
+        #         pipe.load_lora_weights("styles.safetensors", adapter_name="style")
+        #             # self.style_lora_url = weights_url
+        #         # else:
+        #         #     self.style_lora_url = None
+        # except Exception as e:
+        #     print('error in load_lora_weights_from_hf: ', e)
+        print('weights in load_lora_stlye_weights: ', weights)
+        from no_init import no_init_or_tensor
+
+        # weights can be a URLPath, which behaves in unexpected ways
+        weights = str(weights)
+        if self.style_weights == weights:
+            print("skipping loading .. weights already loaded")
+            return
+
+        self.style_weights = weights
+
+        local_weights_cache = self.weights_cache.ensure(weights)
+
+        # load UNET
+        print("Loading fine-tuned model")
+        self.is_lora = False
+
+        maybe_unet_path = os.path.join(local_weights_cache, "unet.safetensors")
+        if not os.path.exists(maybe_unet_path):
+            print("Does not have Unet. assume we are using LoRA")
+            self.is_lora = True
+
+        if not self.is_lora:
+            print("Loading Unet")
+
+            new_unet_params = load_file(
+                os.path.join(local_weights_cache, "unet.safetensors")
+            )
+            # this should return _IncompatibleKeys(missing_keys=[...], unexpected_keys=[])
+            pipe.unet.load_state_dict(new_unet_params, strict=False)
+
+        else:
+            print("Loading Unet LoRA")
+
+            unet = pipe.unet
+
+            tensors = load_file(os.path.join(local_weights_cache, "styles.safetensors"))
+            print('tensors in func load_lora_stlye_weights: ', tensors)
+
+            unet_lora_attn_procs = {}
+            name_rank_map = {}
+            for tk, tv in tensors.items():
+                # up is N, d
+                if tk.endswith("up.weight"):
+                    proc_name = ".".join(tk.split(".")[:-3])
+                    r = tv.shape[1]
+                    name_rank_map[proc_name] = r
+
+            for name, attn_processor in unet.attn_processors.items():
+                cross_attention_dim = (
+                    None
+                    if name.endswith("attn1.processor")
+                    else unet.config.cross_attention_dim
+                )
+                if name.startswith("mid_block"):
+                    hidden_size = unet.config.block_out_channels[-1]
+                elif name.startswith("up_blocks"):
+                    block_id = int(name[len("up_blocks.")])
+                    hidden_size = list(reversed(unet.config.block_out_channels))[
+                        block_id
+                    ]
+                elif name.startswith("down_blocks"):
+                    block_id = int(name[len("down_blocks.")])
+                    hidden_size = unet.config.block_out_channels[block_id]
+                with no_init_or_tensor():
+                    module = LoRAAttnProcessor2_0(
+                        hidden_size=hidden_size,
+                        cross_attention_dim=cross_attention_dim,
+                        rank=name_rank_map[name],
+                    )
+                unet_lora_attn_procs[name] = module.to("cuda", non_blocking=True)
+
+            unet.set_attn_processor(unet_lora_attn_procs)
+            unet.load_state_dict(tensors, strict=False)
+
+        # load text
+        handler = TokenEmbeddingsHandler(
+            [pipe.text_encoder, pipe.text_encoder_2], [pipe.tokenizer, pipe.tokenizer_2]
+        )
+        handler.load_embeddings(os.path.join(local_weights_cache, "embeddings.pti"))
+
+        # load params
+        with open(os.path.join(local_weights_cache, "special_params.json"), "r") as f:
+            params = json.load(f)
+        self.styles_token_map = params
+
+        self.style_tuned_model = True
 
     def load_trained_weights(self, weights, pipe):
         print('weights in load_trained_weights: ', weights)
@@ -185,9 +272,9 @@ class Predictor(BasePredictor):
         # load params
         with open(os.path.join(local_weights_cache, "special_params.json"), "r") as f:
             params = json.load(f)
-        self.token_map = params
+        self.styles_token_map = params
 
-        self.tuned_model = True
+        self.style_tuned_model = True
 
     def setup(self, weights: Optional[Path] = None):
         """Load the model into memory to make running multiple predictions efficient
@@ -205,8 +292,8 @@ class Predictor(BasePredictor):
         weights = 'https://replicate.delivery/pbxt/Qip9WYdKPy5eZiZe1AetWnzmYdppkLHMUA8bE6YVOAfZSwGIB/trained_model.tar'
         print('weights in setup: ', weights)
         start = time.time()
-        self.tuned_model = False
-        self.tuned_weights = None
+        self.style_tuned_model = False
+        self.style_weights = None
         self.style_tuned_weights = None
         # if str(weights) == "weights":
         #     weights = None
@@ -250,7 +337,7 @@ class Predictor(BasePredictor):
 
         if weights:
             print('loading lora weights')
-            self.load_lora_weights_from_hf(weights, self.txt2img_pipe)
+            self.load_lora_stlye_weights(weights, self.txt2img_pipe)
 
         self.txt2img_pipe.to("cuda")
 
@@ -415,9 +502,9 @@ class Predictor(BasePredictor):
             self.txt2img_pipe.vae.to(dtype=torch.float16)
 
         sdxl_kwargs = {}
-        if self.tuned_model:
+        if self.style_tuned_model:
             # consistency with fine-tuning API
-            for k, v in self.token_map.items():
+            for k, v in self.styles_token_map.items():
                 prompt = prompt.replace(k, v)
         print(f"Prompt: {prompt}")
         if image and mask:
