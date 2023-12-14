@@ -209,8 +209,9 @@ class Predictor(BasePredictor):
 
         self.weights_cache = WeightsDownloadCache()
 
-        print("Loading safety checker...")
+        print(f"Loading safety checker...{SAFETY_CACHE}")
         if not os.path.exists(SAFETY_CACHE):
+            print('hey you have not hit the safety cache')
             download_weights(SAFETY_URL, SAFETY_CACHE)
         self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(
             SAFETY_CACHE, torch_dtype=torch.float16
