@@ -83,17 +83,17 @@ def download_coloring_book_weights(url, dest, extract=True):
 class Predictor(BasePredictor):
     def load_lora_weights_from_hf(self, weights_url, pipe, lcm_scale=1.0, style_scale=0.8, scheduler="DDIM"):
         print('load_lora_weights_from_hf')
-        if weights_url != self.style_lora_url:
-            print('inside the if statement')
-            pipe.unload_lora_weights()
-            # self.txt2img.load_lora_weights(lcm_lora_id, adapter_name="lcm")
-            if weights_url:
-                if os.path.exists("styles.safetensors"):
-                    # os.remove("styles.safetensors")
-                    print('styles.safetensors exists')
-                # download_coloring_book_weights(weights_url, "styles.safetensors", extract=True)
-                print('here is the weights url: ', weights_url)
-                pipe.load_lora_weights("styles.safetensors", adapter_name="style")
+        # if weights_url != self.style_lora_url:
+        print('inside the if statement')
+        pipe.unload_lora_weights()
+        # self.txt2img.load_lora_weights(lcm_lora_id, adapter_name="lcm")
+        if weights_url:
+            if os.path.exists("styles.safetensors"):
+                # os.remove("styles.safetensors")
+                print('styles.safetensors exists')
+            # download_coloring_book_weights(weights_url, "styles.safetensors", extract=True)
+            print('here is the weights url: ', weights_url)
+            pipe.load_lora_weights("styles.safetensors", adapter_name="style")
                 # self.style_lora_url = weights_url
             # else:
             #     self.style_lora_url = None
