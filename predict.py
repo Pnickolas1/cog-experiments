@@ -82,17 +82,21 @@ def download_coloring_book_weights(url, dest, extract=True):
 
 class Predictor(BasePredictor):
     def load_lora_weights_from_hf(self, weights_url, pipe, lcm_scale=1.0, style_scale=0.8, scheduler="DDIM"):
+        print('load_lora_weights_from_hf')
         if weights_url != self.style_lora_url:
+            print('inside the if statement')
             pipe.unload_lora_weights()
             # self.txt2img.load_lora_weights(lcm_lora_id, adapter_name="lcm")
             if weights_url:
                 if os.path.exists("styles.safetensors"):
-                    os.remove("styles.safetensors")
-                download_coloring_book_weights(weights_url, "styles.safetensors", extract=False)
+                    # os.remove("styles.safetensors")
+                    print('styles.safetensors exists')
+                # download_coloring_book_weights(weights_url, "styles.safetensors", extract=True)
+                print('here is the weights url: ', weights_url)
                 pipe.load_lora_weights("styles.safetensors", adapter_name="style")
-                self.style_lora_url = weights_url
-            else:
-                self.style_lora_url = None
+                # self.style_lora_url = weights_url
+            # else:
+            #     self.style_lora_url = None
 
     def load_trained_weights(self, weights, pipe):
         from no_init import no_init_or_tensor
@@ -182,8 +186,20 @@ class Predictor(BasePredictor):
         self.tuned_model = True
 
     def setup(self, weights: Optional[Path] = None):
-        """Load the model into memory to make running multiple predictions efficient"""
+        """Load the model into memory to make running multiple predictions efficient
+        
+        1. download weights from weights var
+        2. load finetine weights,
+            and then styles.safetensors
+        3. 
+        
+        self.txt2img.load_lora_weights("style-lora.safetensors", adapter_name="style")
+        
+        
+        """
+
         weights = 'https://replicate.delivery/pbxt/Qip9WYdKPy5eZiZe1AetWnzmYdppkLHMUA8bE6YVOAfZSwGIB/trained_model.tar'
+        print('weights in setup: ', weights)
         start = time.time()
         self.tuned_model = False
         self.tuned_weights = None
