@@ -207,7 +207,7 @@ class Predictor(BasePredictor):
         # if str(weights) == "weights":
         #     weights = None
 
-        self.weights_cache = WeightsDownloadCache()
+        # self.weights_cache = WeightsDownloadCache()
 
         print(f"Loading safety checker...{SAFETY_CACHE}")
         if not os.path.exists(SAFETY_CACHE):
