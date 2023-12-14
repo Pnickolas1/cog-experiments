@@ -295,6 +295,8 @@ class Predictor(BasePredictor):
         self.style_tuned_model = False
         self.style_weights = None
         self.style_tuned_weights = None
+        self.tuned_model = False
+        self.tuned_weights = None
         # if str(weights) == "weights":
         #     weights = None
 
