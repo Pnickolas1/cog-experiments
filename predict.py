@@ -197,7 +197,7 @@ class Predictor(BasePredictor):
         
         
         """
-
+        print('weights in setup: ', weights)
         weights = 'https://replicate.delivery/pbxt/Qip9WYdKPy5eZiZe1AetWnzmYdppkLHMUA8bE6YVOAfZSwGIB/trained_model.tar'
         print('weights in setup: ', weights)
         start = time.time()
