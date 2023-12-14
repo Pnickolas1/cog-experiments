@@ -242,8 +242,8 @@ class Predictor(BasePredictor):
         if weights:
             self.load_trained_weights(weights, self.txt2img_pipe)
 
-        if weights:
-            self.load_lora_weights_from_hf(weights, self.txt2img_pipe)
+        # if weights:
+        #     self.load_lora_weights_from_hf(weights, self.txt2img_pipe)
 
         self.txt2img_pipe.to("cuda")
 
