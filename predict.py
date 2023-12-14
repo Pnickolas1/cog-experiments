@@ -99,6 +99,7 @@ class Predictor(BasePredictor):
             #     self.style_lora_url = None
 
     def load_trained_weights(self, weights, pipe):
+        print('weights in load_trained_weights: ', weights)
         from no_init import no_init_or_tensor
 
         # weights can be a URLPath, which behaves in unexpected ways
