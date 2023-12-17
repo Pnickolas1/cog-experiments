@@ -6,7 +6,6 @@ import subprocess
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from weights import WeightsDownloadCache
-
 import numpy as np
 import torch
 from cog import BasePredictor, Input, Path
@@ -29,9 +28,12 @@ from diffusers.utils import load_image
 from safetensors import safe_open
 from safetensors.torch import load_file
 from transformers import CLIPImageProcessor
+os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 
 from dataset_and_utils import TokenEmbeddingsHandler
-STLYE_CACHE = "./style-cache"
+
+from huggingface_hub import hf_hub_download
+
 SDXL_MODEL_CACHE = "./sdxl-cache"
 REFINER_MODEL_CACHE = "./refiner-cache"
 SAFETY_CACHE = "./safety-cache"
@@ -42,8 +44,12 @@ REFINER_URL = (
 )
 SAFETY_URL = "https://weights.replicate.delivery/default/sdxl/safety-1.0.tar"
 
-COLORING_BOOK_REDMOND = "artificialguybr/ColoringBookRedmond-V2"
-COLORING_BOOK_TENSORS = "ColoringBookRedmond-ColoringBook-ColoringBookAF.safetensors"
+
+MODEL_NAME = "SG161222/RealVisXL_V2.0"
+SDXL = 'stabilityai/stable-diffusion-xl-base-1.0'
+COLORING_BOOK_MODEL_NAME = "artificialguybr/ColoringBookRedmond-V2"
+COLORING_BOOK_WEIGHTS_NAME = "ColoringBookRedmond-ColoringBook-ColoringBookAF.safetensors"
+MODEL_CACHE = "model-cache"
 
 class KarrasDPM:
     def from_config(config):
@@ -60,16 +66,7 @@ SCHEDULERS = {
     "PNDM": PNDMScheduler,
 }
 
-
-def download_weights(url, dest):
-    start = time.time()
-    print("downloading url: ", url)
-    print("downloading to: ", dest)
-    subprocess.check_call(["pget", "-x", url, dest], close_fds=False)
-    print("downloading took: ", time.time() - start)
-
-def download_coloring_book_weights(url, dest, extract=True):
-    print("downloading coloring book weights")
+def download_weights(url, dest, extract=True):
     start = time.time()
     print("downloading url: ", url)
     print("downloading to: ", dest)
@@ -81,114 +78,7 @@ def download_coloring_book_weights(url, dest, extract=True):
     print("downloading took: ", time.time() - start)
 
 class Predictor(BasePredictor):
-    def load_lora_stlye_weights(self, weights, pipe, lcm_scale=1.0, style_scale=0.8, scheduler="DDIM"):
-        # try:
-        #     print('load_lora_weights_from_hf')
-        #     # if weights_url != self.style_lora_url:
-        #     print('inside the if statement')
-        #     pipe.unload_lora_weights()
-        #     # self.txt2img.load_lora_weights(lcm_lora_id, adapter_name="lcm")
-        #     if weights_url:
-        #         # if os.path.exists("styles.safetensors"):
-        #         #     # os.remove("styles.safetensors")
-        #         #     print('styles.safetensors exists')
-        #         # download_coloring_book_weights(weights_url, "styles.safetensors", extract=True)
-        #         print('here is the weights url: ', weights_url)
-        #         pipe.load_lora_weights("styles.safetensors", adapter_name="style")
-        #             # self.style_lora_url = weights_url
-        #         # else:
-        #         #     self.style_lora_url = None
-        # except Exception as e:
-        #     print('error in load_lora_weights_from_hf: ', e)
-        print('weights in load_lora_stlye_weights: ', weights)
-        from no_init import no_init_or_tensor
-
-        # weights can be a URLPath, which behaves in unexpected ways
-        weights = str(weights)
-        if self.style_weights == weights:
-            print("skipping loading .. weights already loaded")
-            return
-
-        self.style_weights = weights
-
-        local_weights_cache = self.weights_cache.ensure(weights)
-
-        # load UNET
-        print("Loading fine-tuned model")
-        self.is_lora = False
-
-        maybe_unet_path = os.path.join(local_weights_cache, "unet.safetensors")
-        if not os.path.exists(maybe_unet_path):
-            print("Does not have Unet. assume we are using LoRA")
-            self.is_lora = True
-
-        if not self.is_lora:
-            print("Loading Unet")
-
-            new_unet_params = load_file(
-                os.path.join(local_weights_cache, "unet.safetensors")
-            )
-            # this should return _IncompatibleKeys(missing_keys=[...], unexpected_keys=[])
-            pipe.unet.load_state_dict(new_unet_params, strict=False)
-
-        else:
-            print("Loading Unet LoRA")
-
-            unet = pipe.unet
-
-            tensors = load_file(os.path.join(local_weights_cache, "styles.safetensors"))
-            pipe.load_lora_weights(tensors, adapter_name="style")
-            unet_lora_attn_procs = {}
-            name_rank_map = {}
-            # for tk, tv in tensors.items():
-            #     # up is N, d
-            #     if tk.endswith("up.weight"):
-            #         proc_name = ".".join(tk.split(".")[:-3])
-            #         r = tv.shape[1]
-            #         name_rank_map[proc_name] = r
-
-            # for name, attn_processor in unet.attn_processors.items():
-            #     cross_attention_dim = (
-            #         None
-            #         if name.endswith("attn1.processor")
-            #         else unet.config.cross_attention_dim
-            #     )
-            #     if name.startswith("mid_block"):
-            #         hidden_size = unet.config.block_out_channels[-1]
-            #     elif name.startswith("up_blocks"):
-            #         block_id = int(name[len("up_blocks.")])
-            #         hidden_size = list(reversed(unet.config.block_out_channels))[
-            #             block_id
-            #         ]
-            #     elif name.startswith("down_blocks"):
-            #         block_id = int(name[len("down_blocks.")])
-            #         hidden_size = unet.config.block_out_channels[block_id]
-            #     with no_init_or_tensor():
-            #         module = LoRAAttnProcessor2_0(
-            #             hidden_size=hidden_size,
-            #             cross_attention_dim=cross_attention_dim,
-            #             rank=name_rank_map[name],
-            #         )
-            #     unet_lora_attn_procs[name] = module.to("cuda", non_blocking=True)
-
-            # unet.set_attn_processor(unet_lora_attn_procs)
-            # unet.load_state_dict(tensors, strict=False)
-
-        # load text
-        handler = TokenEmbeddingsHandler(
-            [pipe.text_encoder, pipe.text_encoder_2], [pipe.tokenizer, pipe.tokenizer_2]
-        )
-        handler.load_embeddings(os.path.join(local_weights_cache, "embeddings.pti"))
-
-        # load params
-        with open(os.path.join(local_weights_cache, "special_params.json"), "r") as f:
-            params = json.load(f)
-        self.styles_token_map = params
-
-        self.style_tuned_model = True
-
     def load_trained_weights(self, weights, pipe):
-        print('weights in load_trained_weights: ', weights)
         from no_init import no_init_or_tensor
 
         # weights can be a URLPath, which behaves in unexpected ways
@@ -271,52 +161,81 @@ class Predictor(BasePredictor):
         # load params
         with open(os.path.join(local_weights_cache, "special_params.json"), "r") as f:
             params = json.load(f)
-        self.styles_token_map = params
+        self.token_map = params
 
-        self.style_tuned_model = True
+        self.tuned_model = True
+
+    def download_coloring_book_weights(self):
+        try:
+            dest_a = 'style.safetensors'
+            # Download and save first set of weights
+            if os.path.exists(dest_a):
+                os.remove(dest_a)
+            fn_a = hf_hub_download(repo_id=COLORING_BOOK_MODEL_NAME, filename=COLORING_BOOK_WEIGHTS_NAME)
+            print("fn_a: ", fn_a)
+            shutil.copy(fn_a, dest_a)
+            os.remove(fn_a)
+
+        except Exception as e:
+            print("Error downloading coloring book weights: ", e)
+            fn = None
 
     def setup(self, weights: Optional[Path] = None):
-        """Load the model into memory to make running multiple predictions efficient
-        
-        1. download weights from weights var
-        2. load finetine weights,
-            and then styles.safetensors
-        3. 
-        
-        self.txt2img.load_lora_weights("style-lora.safetensors", adapter_name="style")
-        
-        
-        """
-        print('weights in setup: ', weights)
-        weights = 'https://replicate.delivery/pbxt/Qip9WYdKPy5eZiZe1AetWnzmYdppkLHMUA8bE6YVOAfZSwGIB/trained_model.tar'
-        print('weights in setup: ', weights)
+        """Load the model into memory to make running multiple predictions efficient"""
+        # weights = 'https://replicate.delivery/pbxt/jIkgCatUxjLiDpDAzkfs2kvxrDM2zkRHGEk2eDxLGHvmkkfjA/lora.safetensors'
+        print("Setting up predictor...")
+        print('weights: ', weights)
         start = time.time()
-        self.style_tuned_model = False
-        self.style_weights = None
-        self.style_tuned_weights = None
         self.tuned_model = False
         self.tuned_weights = None
-        # if str(weights) == "weights":
-        #     weights = None
+
+        self.lora_url = 'setup'  # this allows us to load the weights on the first run
+
+        if str(weights) == "weights":
+            weights = None
 
         self.weights_cache = WeightsDownloadCache()
-
-        print(f"Loading safety checker...{SAFETY_CACHE}")
+    
+        print("Loading safety checker...")
         if not os.path.exists(SAFETY_CACHE):
-            print('hey you have not hit the safety cache')
             download_weights(SAFETY_URL, SAFETY_CACHE)
         self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(
             SAFETY_CACHE, torch_dtype=torch.float16
         ).to("cuda")
         self.feature_extractor = CLIPImageProcessor.from_pretrained(FEATURE_EXTRACTOR)
 
-        if not os.path.exists(STLYE_CACHE):
-            print('hey you have hit the style cache')
-        else:
-            print('you have not hit the style cache')
-
         if not os.path.exists(SDXL_MODEL_CACHE):
             download_weights(SDXL_URL, SDXL_MODEL_CACHE)
+
+        print("Loading sdxl txt2img pipeline...")
+        if not os.path.exists(SDXL_MODEL_CACHE):
+            download_weights(SDXL_URL, SDXL_MODEL_CACHE)
+        self.txt2img = DiffusionPipeline.from_pretrained(
+            SDXL_MODEL_CACHE,
+            variant="fp16",
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+        ).to("cuda")
+        self.original_scheduler = self.txt2img.scheduler
+        if weights:
+            self.load_lora_weights(str(weights))
+        else:
+            self.load_lora_weights(None)
+
+        self.txt2img.to("cuda")
+
+        if not os.path.exists(REFINER_MODEL_CACHE):
+            download_weights(REFINER_URL, REFINER_MODEL_CACHE)
+
+        print("Loading refiner pipeline...")
+        self.refiner = DiffusionPipeline.from_pretrained(
+            REFINER_MODEL_CACHE,
+            text_encoder_2=self.txt2img.text_encoder_2,
+            vae=self.txt2img.vae,
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+            variant="fp16",
+        ).to("cuda")
 
         print("Loading sdxl txt2img pipeline...")
         self.txt2img_pipe = DiffusionPipeline.from_pretrained(
@@ -326,19 +245,8 @@ class Predictor(BasePredictor):
             variant="fp16",
         )
         self.is_lora = False
-
-        if os.path.exists("./trained-model"):
-            print("Contents of 'trained-model' directory:")
-            for filename in os.listdir("./trained-model"):
-                print('filename: ', filename)
-
-        if weights:
-            print('loading traing weights')
+        if weights or os.path.exists("./trained-model"):
             self.load_trained_weights(weights, self.txt2img_pipe)
-
-        if weights:
-            print('loading lora weights')
-            self.load_lora_stlye_weights(weights, self.txt2img_pipe)
 
         self.txt2img_pipe.to("cuda")
 
@@ -391,6 +299,19 @@ class Predictor(BasePredictor):
     def load_image(self, path):
         shutil.copyfile(path, "/tmp/image.png")
         return load_image("/tmp/image.png").convert("RGB")
+
+    def load_lora_weights_from_hf(self, weights_url, lcm_scale=1.0, style_scale=0.8, scheduler="DDIM"):
+        if weights_url != self.lora_url:
+            self.txt2img.unload_lora_weights()
+            # self.txt2img.load_lora_weights(lcm_lora_id, adapter_name="lcm")
+            if weights_url:
+                if os.path.exists("style-lora.safetensors"):
+                    os.remove("style-lora.safetensors")
+                download_weights(weights_url, "style-lora.safetensors", extract=False)
+                self.txt2img.load_lora_weights("style-lora.safetensors", adapter_name="style")
+                self.lora_url = weights_url
+            else:
+                self.lora_url = None
 
     def run_safety_checker(self, image):
         safety_checker_input = self.feature_extractor(image, return_tensors="pt").to(
@@ -481,10 +402,10 @@ class Predictor(BasePredictor):
             le=1.0,
             default=0.6,
         ),
-        # replicate_weights: str = Input(
-        #     description="Replicate LoRA weights to use. Leave blank to use the default weights.",
-        #     default=None,
-        # ),
+        replicate_weights: str = Input(
+            description="Replicate LoRA weights to use. Leave blank to use the default weights.",
+            default=None,
+        ),
         disable_safety_checker: bool = Input(
             description="Disable safety checker for generated images. This feature is only available through the API. See [https://replicate.com/docs/how-does-replicate-work#safety](https://replicate.com/docs/how-does-replicate-work#safety)",
             default=False
@@ -495,17 +416,17 @@ class Predictor(BasePredictor):
             seed = int.from_bytes(os.urandom(2), "big")
         print(f"Using seed: {seed}")
 
-        # if replicate_weights:
-            # self.load_trained_weights(replicate_weights, self.txt2img_pipe)
+        if replicate_weights:
+            self.load_trained_weights(replicate_weights, self.txt2img_pipe)
         
         # OOMs can leave vae in bad state
         if self.txt2img_pipe.vae.dtype == torch.float32:
             self.txt2img_pipe.vae.to(dtype=torch.float16)
 
         sdxl_kwargs = {}
-        if self.style_tuned_model:
+        if self.tuned_model:
             # consistency with fine-tuning API
-            for k, v in self.styles_token_map.items():
+            for k, v in self.token_map.items():
                 prompt = prompt.replace(k, v)
         print(f"Prompt: {prompt}")
         if image and mask:
