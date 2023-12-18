@@ -114,59 +114,58 @@ class Predictor(BasePredictor):
 
         else:
             print("Loading Unet LoRA")
-
-            unet = pipe.unet
-
             tensors = load_file(os.path.join(local_weights_cache, "styles.safetensors"))
             pipe.load_lora_weights(tensors, adapter_name="style")
-            unet_lora_attn_procs = {}
-            name_rank_map = {}
-            # for tk, tv in tensors.items():
-            #     # up is N, d
-            #     if tk.endswith("up.weight"):
-            #         proc_name = ".".join(tk.split(".")[:-3])
-            #         r = tv.shape[1]
-            #         name_rank_map[proc_name] = r
-
-            # for name, attn_processor in unet.attn_processors.items():
-            #     cross_attention_dim = (
-            #         None
-            #         if name.endswith("attn1.processor")
-            #         else unet.config.cross_attention_dim
-            #     )
-            #     if name.startswith("mid_block"):
-            #         hidden_size = unet.config.block_out_channels[-1]
-            #     elif name.startswith("up_blocks"):
-            #         block_id = int(name[len("up_blocks.")])
-            #         hidden_size = list(reversed(unet.config.block_out_channels))[
-            #             block_id
-            #         ]
-            #     elif name.startswith("down_blocks"):
-            #         block_id = int(name[len("down_blocks.")])
-            #         hidden_size = unet.config.block_out_channels[block_id]
-            #     with no_init_or_tensor():
-            #         module = LoRAAttnProcessor2_0(
-            #             hidden_size=hidden_size,
-            #             cross_attention_dim=cross_attention_dim,
-            #             rank=name_rank_map[name],
-            #         )
-            #     unet_lora_attn_procs[name] = module.to("cuda", non_blocking=True)
-
-            # unet.set_attn_processor(unet_lora_attn_procs)
-            # unet.load_state_dict(tensors, strict=False)
 
         # load text
-        handler = TokenEmbeddingsHandler(
-            [pipe.text_encoder, pipe.text_encoder_2], [pipe.tokenizer, pipe.tokenizer_2]
-        )
-        handler.load_embeddings(os.path.join(local_weights_cache, "embeddings.pti"))
+        # handler = TokenEmbeddingsHandler(
+        #     [pipe.text_encoder, pipe.text_encoder_2], [pipe.tokenizer, pipe.tokenizer_2]
+        # )
+        # handler.load_embeddings(os.path.join(local_weights_cache, "embeddings.pti"))
 
         # load params
-        with open(os.path.join(local_weights_cache, "special_params.json"), "r") as f:
-            params = json.load(f)
-        self.styles_token_map = params
+        # with open(os.path.join(local_weights_cache, "special_params.json"), "r") as f:
+        #     params = json.load(f)
+        # self.styles_token_map = params
 
-        self.style_tuned_model = True
+        # self.style_tuned_model = True
+            
+    def load_trained_weights_version_two(self, weights, pipe):
+        print('weights in load_lora_stlye_weights: ', weights)
+        from no_init import no_init_or_tensor
+        # weights can be a URLPath, which behaves in unexpected ways
+        weights = str(weights)
+        if self.style_weights == weights:
+            print("skipping loading .. weights already loaded")
+            return
+
+        self.style_weights = weights
+
+        local_weights_cache = self.weights_cache.ensure(weights)
+
+        # load UNET
+        print("Loading fine-tuned model")
+        self.is_lora = False
+
+        maybe_unet_path = os.path.join(local_weights_cache, "unet.safetensors")
+        if not os.path.exists(maybe_unet_path):
+            print("Does not have Unet. assume we are using LoRA")
+            self.is_lora = True
+
+        if not self.is_lora:
+            print("Loading Unet")
+
+            new_unet_params = load_file(
+                os.path.join(local_weights_cache, "unet.safetensors")
+            )
+            # this should return _IncompatibleKeys(missing_keys=[...], unexpected_keys=[])
+            pipe.unet.load_state_dict(new_unet_params, strict=False)
+
+        else:
+            print("Loading Unet LoRA")
+            tensors = load_file(os.path.join(local_weights_cache, "lora.safetensors"))
+            pipe.load_lora_weights(tensors, adapter_name="training")
+
 
     def load_trained_weights(self, weights, pipe):
         print('weights in load_trained_weights: ', weights)
@@ -320,6 +319,10 @@ class Predictor(BasePredictor):
         if weights:
             print('loading lora weights')
             self.load_lora_stlye_weights(weights, self.txt2img_pipe)
+
+        self.txt2img_pipe.set_adapters(["style", "training"], adapter_weights=[1.0, 1.0])
+        active_adapters = self.txt2img_pipe.get_active_adapters()
+        print("active adapters: ", active_adapters) 
 
         self.txt2img_pipe.to("cuda")
 
@@ -484,10 +487,10 @@ class Predictor(BasePredictor):
             self.txt2img_pipe.vae.to(dtype=torch.float16)
 
         sdxl_kwargs = {}
-        if self.style_tuned_model:
-            # consistency with fine-tuning API
-            for k, v in self.styles_token_map.items():
-                prompt = prompt.replace(k, v)
+        # if self.style_tuned_model:
+        #     # consistency with fine-tuning API
+        #     for k, v in self.styles_token_map.items():
+        #         prompt = prompt.replace(k, v)
         print(f"Prompt: {prompt}")
         if image and mask:
             print("inpainting mode")
