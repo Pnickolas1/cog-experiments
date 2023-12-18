@@ -195,14 +195,6 @@ def train(
     shutil.copy(fn_a, dest_a)
     os.remove(fn_a)
 
-    # with tarfile.open(out_path, "w") as tar:
-
-    #     for file_path in directory.rglob("*"):
-    #         print('file_path', file_path)
-    #         arcname = file_path.relative_to(directory)
-    #         print('arcname: ', arcname)
-    #         tar.add(file_path, arcname=arcname)
-
     with tarfile.open(out_path, "w") as tar:
         # Add files from the directory
         for file_path in directory.rglob("*"):
