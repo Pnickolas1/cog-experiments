@@ -10,50 +10,6 @@ from preprocess import preprocess
 from trainer_pti import main
 OUTPUT_DIR = "training_out"
 
-# class TrainingOutput(BaseModel):
-#     weights: Path
-#     weights_b: Path
-
-# def train(
-#         repo_id_a: str = Input(
-#             description="First Hugging Face repo to import",
-#         ),
-#         weights_a: str = Input(
-#             description="First safetensor weights to import",
-#         ),
-#         repo_id_b: str = Input(
-#             description="Second Hugging Face repo to import",
-#         ),
-#         weights_b: str = Input(
-#             description="Second safetensor weights to import",
-#         )
-# ) -> TrainingOutput:
-
-#     dest_a = 'lora_a.safetensors'
-#     dest_b = 'lora_b.safetensors'
-
-#     # Download and save first set of weights
-#     if os.path.exists(dest_a):
-#         os.remove(dest_a)
-#     fn_a = hf_hub_download(repo_id=repo_id_a, filename=weights_a)
-#     shutil.copy(fn_a, dest_a)
-#     os.remove(fn_a)
-
-#     # Download and save second set of weights
-#     if os.path.exists(dest_b):
-#         os.remove(dest_b)
-#     fn_b = hf_hub_download(repo_id=repo_id_b, filename=weights_b)
-#     shutil.copy(fn_b, dest_b)
-#     os.remove(fn_b)
-
-#     print(f"Weights copied to {dest_a} and {dest_b}")
-#     return TrainingOutput(weights=Path(dest_a), weights_b=Path(dest_b))
-
-"""
-Wrapper around actual trainer.
-"""
-
-
 class TrainingOutput(BaseModel):
     weights: Path
 
@@ -238,14 +194,6 @@ def train(
     print('fn_a: ', fn_a)
     shutil.copy(fn_a, dest_a)
     os.remove(fn_a)
-
-    # with tarfile.open(out_path, "w") as tar:
-
-    #     for file_path in directory.rglob("*"):
-    #         print('file_path', file_path)
-    #         arcname = file_path.relative_to(directory)
-    #         print('arcname: ', arcname)
-    #         tar.add(file_path, arcname=arcname)
 
     with tarfile.open(out_path, "w") as tar:
         # Add files from the directory
