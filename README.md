@@ -46,7 +46,15 @@ cog push r8.im/pnickolas1/cog-experiments
 
 # Working versions
 
+### cog-experiments-v2
+
 ```
 - 28beee53afff7ee070c72c2984dbabadea81e36d86fe8120acc85e0d4c56112b
 
+```
+
+### cog-experiments
+
+```
+  - 5e350f6e03a5efdf18084f9ec17497ab117c76f631c672a85ee21c0f2ba7bb50
 ```
