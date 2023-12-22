@@ -43,3 +43,10 @@ cog push r8.im/pnickolas1/cog-experiments
 ##### More
 
 [ZipLoRA PyTorch](https://github.com/mkshing/ziplora-pytorch)
+
+# Working versions
+
+```
+- 28beee53afff7ee070c72c2984dbabadea81e36d86fe8120acc85e0d4c56112b
+
+```
